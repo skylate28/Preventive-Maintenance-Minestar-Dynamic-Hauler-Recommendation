@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Deteksi Hauler Takang</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#f4f6fa; --card:#ffffff; --ink:#1a2332; --muted:#64748b; --line:#e2e8f0;
+  --navy:#1F4E78; --red:#d92626; --darkred:#a11212; --orange:#ED7D31; --amber:#e8a800;
+  --green:#1f9d55; --lgreen:#e6f4ec; --lamber:#fdf3d7; --lred:#fdeaea;
+}
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',system-ui,Arial,sans-serif}
+body{background:var(--bg);color:var(--ink);padding:24px}
+.wrap{max-width:1240px;margin:0 auto}
+header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:8px;margin-bottom:20px}
+h1{font-size:22px;color:var(--navy)}
+.sub{color:var(--muted);font-size:13px;margin-top:4px}
+.badge-date{background:var(--navy);color:#fff;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600}
+.drop{border:2px dashed var(--navy);border-radius:12px;background:var(--card);padding:36px;text-align:center;cursor:pointer;transition:.15s;margin-bottom:20px}
+.drop.small{padding:12px;font-size:13px}
+.drop:hover,.drop.over{background:#eaf1f8}
+.drop b{color:var(--navy)}
+.drop .hint{font-size:12px;color:var(--muted);margin-top:6px}
+.privacy{font-size:12px;color:var(--green);margin-top:8px}
+.status{font-size:13px;margin-top:10px;color:var(--muted)}
+.status.err{color:var(--red);font-weight:600}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+.kpi .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.kpi .val{font-size:30px;font-weight:700;margin-top:4px}
+.kpi .det{font-size:12px;color:var(--muted);margin-top:2px}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px;margin-bottom:20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px}
+.card h2{font-size:14px;color:var(--navy);margin-bottom:12px}
+.span4{grid-column:span 4}.span12{grid-column:span 12}
+@media(max-width:900px){.span4{grid-column:span 12}}
+canvas{max-height:260px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:var(--navy);color:#fff;padding:8px 10px;text-align:left;position:sticky;top:0;cursor:pointer;user-select:none;white-space:nowrap}
+td{padding:7px 10px;border-bottom:1px solid var(--line)}
+tr:hover td{background:#f0f4f9}
+.pill{display:inline-block;padding:2px 10px;border-radius:12px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.p-tts{background:var(--darkred);color:#fff}.p-ttg{background:var(--red);color:#fff}
+.p-tbs{background:var(--orange);color:#fff}.p-tbg{background:#FFC000;color:#5a4300}
+.p-int{background:var(--lamber);color:#7a5c00}.p-seh{background:var(--lgreen);color:var(--green)}
+.d-ok{background:var(--lgreen);color:var(--green)}.d-cond{background:var(--lamber);color:#7a5c00}.d-no{background:var(--lred);color:var(--red)}
+.pr-badge{display:inline-block;min-width:34px;text-align:center;padding:2px 8px;border-radius:6px;font-weight:700;font-size:12px}
+.pr-P1{background:var(--darkred);color:#fff}.pr-P2{background:var(--red);color:#fff}
+.pr-P3{background:var(--orange);color:#fff}.pr-P4{background:var(--lamber);color:#7a5c00}
+.controls{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.controls input,.controls select{padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;color:var(--ink)}
+.controls input{flex:1;min-width:180px}
+.tbl-scroll{max-height:480px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.note{font-size:12px;color:var(--muted);font-style:italic;margin-top:16px}
+.foot{font-size:11px;color:var(--muted);margin-top:24px;text-align:center}
+#dash{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <h1>Dashboard Deteksi Hauler Takang</h1>
+    <div class="sub">Kesehatan telemetri MineStar &middot; prioritas perbaikan &middot; kesiapan Dynamic Loading</div>
+  </div>
+  <div class="badge-date" id="badgePeriod" style="display:none">-</div>
+</header>
+
+<div class="drop" id="drop">
+  <div id="dropTxt"><b>Tarik &amp; letakkan file export cycle MineStar di sini</b> atau klik untuk memilih file</div>
+  <div class="hint">Format: .xlsx / .csv &mdash; minimal berisi kolom TYPE, FIRSTMACHINE, FIRSTMACHINECLASS, CYCLESHIFT, CYCLEDATE, STARTTIME, SOURCE/ASGNSOURCE, SINK/ASGNSINK, PAYLOADACT, MTDISTANCE, LDDISTANCE, TOTDISTANCE</div>
+  <div class="privacy">File diproses sepenuhnya di browser Anda &mdash; tidak ada data yang terkirim ke internet.</div>
+  <div class="status" id="status"></div>
+  <input type="file" id="file" accept=".xlsx,.xls,.csv" hidden>
+</div>
+
+<div id="dash">
+<div class="kpis" id="kpis"></div>
+<div class="grid">
+  <div class="card span4"><h2>Komposisi klasifikasi fleet</h2><canvas id="chDonut"></canvas></div>
+  <div class="card span4"><h2>Kesiapan Dynamic Loading</h2><canvas id="chDL"></canvas></div>
+  <div class="card span4"><h2>Jenis error &amp; breakdown shift</h2><canvas id="chErr"></canvas></div>
+</div>
+<div class="grid">
+  <div class="card span12">
+    <h2>Skala prioritas perbaikan MineStar</h2>
+    <div class="tbl-scroll" style="max-height:360px">
+    <table id="tblPr"><thead><tr>
+      <th>No</th><th>Prioritas</th><th>Unit</th><th>Klasifikasi</th><th>Cycle</th><th>Bermasalah</th><th>%</th><th>Run</th><th>Tindakan</th>
+    </tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</div>
+<div class="grid">
+  <div class="card span12">
+    <h2>Detail semua unit</h2>
+    <div class="controls">
+      <input id="q" type="text" placeholder="Cari unit... (mis. CO4208)">
+      <select id="fk"><option value="">Semua klasifikasi</option></select>
+      <select id="fd"><option value="">Semua status DL</option>
+        <option>Layak</option><option>Layak Bersyarat</option><option>Tidak Layak</option></select>
+    </div>
+    <div class="tbl-scroll">
+    <table id="tblU"><thead><tr>
+      <th data-s="u">Unit</th><th data-s="kls">Kelas</th><th data-s="c">Cycle</th><th data-s="b">Bermasalah</th>
+      <th data-s="p">%</th><th data-s="run">Run</th><th data-s="g">GPS</th><th data-s="s">Status</th>
+      <th data-s="k">Klasifikasi</th><th data-s="dl">Rekomendasi DL</th><th data-s="pr">Prioritas</th>
+    </tr></thead><tbody></tbody></table>
+    </div>
+    <div class="note">Klasifikasi dari file yang dimuat &mdash; keputusan final perbaikan dan pool Dynamic Loading sebaiknya dari 5&ndash;7 hari data. Rekomendasi DL murni dari kualitas telemetri; kondisi mekanis unit tetap perlu diverifikasi.</div>
+  </div>
+</div>
+</div>
+
+<div class="foot">Metode 4 lapis: uji cycle (kosong / salah nilai vs median rute / takang status) &rarr; uji rute-vs-unit &rarr; klasifikasi unit (persentase + run beruntun) &rarr; jenis kerusakan dominan</div>
+</div>
+
+<script>
+/*COMPUTE_START*/
+function median(arr){
+  if(!arr.length) return null;
+  const a=[...arr].sort((x,y)=>x-y), m=Math.floor(a.length/2);
+  return a.length%2 ? a[m] : (a[m-1]+a[m])/2;
+}
+function num(v){ const n=Number(v); return isFinite(n)? n : 0; }
+function computeAll(rows){
+  // ---- persiapan cycle truck ----
+  const trucks=[];
+  for(const r of rows){
+    if(r.TYPE!=='Truck') continue;
+    const src = (r.SOURCE!=null && r.SOURCE!=='') ? r.SOURCE : ((r.ASGNSOURCE!=null && r.ASGNSOURCE!=='') ? r.ASGNSOURCE : 'nan');
+    const snk = (r.SINK!=null && r.SINK!=='') ? r.SINK : ((r.ASGNSINK!=null && r.ASGNSINK!=='') ? r.ASGNSINK : 'nan');
+    trucks.push({
+      u:String(r.FIRSTMACHINE||''), kls:String(r.FIRSTMACHINECLASS||''),
+      shift:String(r.CYCLESHIFT||''), start:num(r.STARTTIME), date:r.CYCLEDATE,
+      route:src+' -> '+snk, mt:num(r.MTDISTANCE), ld:num(r.LDDISTANCE),
+      tot:(r.TOTDISTANCE!=null && r.TOTDISTANCE!=='' && isFinite(Number(r.TOTDISTANCE)))? Number(r.TOTDISTANCE):null,
+      prod:num(r.PAYLOADACT)>0
+    });
+  }
+  // ---- lapis 1: statistik rute dari cycle sehat ----
+  const rt={};
+  for(const c of trucks){
+    if(c.mt>0 && c.ld>0){
+      (rt[c.route]=rt[c.route]||{mt:[],ld:[],tot:[]});
+      rt[c.route].mt.push(c.mt); rt[c.route].ld.push(c.ld);
+      if(c.tot!=null) rt[c.route].tot.push(c.tot);
+    }
+  }
+  const rstat={};
+  for(const k in rt) rstat[k]={medMT:median(rt[k].mt),medLD:median(rt[k].ld),medTOT:median(rt[k].tot),n:rt[k].mt.length};
+  // ---- klasifikasi per cycle ----
+  for(const c of trucks){
+    const s=rstat[c.route];
+    let err='OK';
+    if(c.ld<=0 && s && s.medTOT!=null && s.medTOT>0 && c.mt>=0.75*s.medTOT) err='STATUS';
+    else if(c.prod && (c.mt<=0||c.ld<=0)) err='GPS';
+    else if(s && s.n>=5){
+      for(const [v,m] of [[c.mt,s.medMT],[c.ld,s.medLD]]){
+        if(v>0 && m>0 && (v<0.4*m || v>2.5*m)){ err='GPS'; break; }
+      }
+    }
+    c.err=err; c.bad=err!=='OK';
+  }
+  // ---- lapis 3-4: per unit ----
+  const byUnit={};
+  for(const c of trucks) (byUnit[c.u]=byUnit[c.u]||[]).push(c);
+  const units=[];
+  for(const u in byUnit){
+    const g=byUnit[u].slice().sort((a,b)=>a.start-b.start);
+    const n=g.length, b=g.filter(x=>x.bad).length, p=b/n*100;
+    let run=0,mx=0;
+    for(const x of g){ run=x.bad?run+1:0; if(run>mx)mx=run; }
+    const ng=g.filter(x=>x.err==='GPS').length, ns=g.filter(x=>x.err==='STATUS').length;
+    const dom=ng>=ns?'GPS':'STATUS';
+    let k;
+    if(p>=95) k='Takang Total '+dom;
+    else if(p>30||mx>=5) k='Takang Berat '+dom;
+    else if(p>5) k='Intermiten';
+    else k='Sehat';
+    const dl = k==='Sehat'?'Layak':(k==='Intermiten'&&p<=15&&mx<3?'Layak Bersyarat':'Tidak Layak');
+    units.push({u, kls:g[0].kls, c:n, b, p:Math.round(p*10)/10, run:mx, g:ng, s:ns, k,
+      ds:g.filter(x=>x.shift==='DS').length, ns2:g.filter(x=>x.shift==='NS').length,
+      bds:g.filter(x=>x.shift==='DS'&&x.bad).length, bns:g.filter(x=>x.shift==='NS'&&x.bad).length, dl});
+  }
+  // prioritas: severity + utilisasi (median cycle fleet)
+  const medC=median(units.map(x=>x.c));
+  for(const x of units){
+    if(x.k.startsWith('Takang Total')) x.pr='P1';
+    else if(x.k.startsWith('Takang Berat')) x.pr = x.c>=medC?'P2':'P3';
+    else if(x.k==='Intermiten') x.pr='P4';
+    else x.pr='';
+    x.ns=x.ns2; delete x.ns2;
+  }
+  units.sort((a,b)=>a.u.localeCompare(b.u));
+  const S={
+    total_units:units.length, total_cycles:trucks.length,
+    bad:trucks.filter(x=>x.bad).length,
+    gps:trucks.filter(x=>x.err==='GPS').length,
+    status:trucks.filter(x=>x.err==='STATUS').length,
+    ds_cycles:trucks.filter(x=>x.shift==='DS').length,
+    ns_cycles:trucks.filter(x=>x.shift==='NS').length,
+    ds_bad:trucks.filter(x=>x.shift==='DS'&&x.bad).length,
+    ns_bad:trucks.filter(x=>x.shift==='NS'&&x.bad).length,
+    median_cycles:medC
+  };
+  return {summary:S, units};
+}
+/*COMPUTE_END*/
+
+// ================= UI =================
+const REQUIRED=['TYPE','FIRSTMACHINE','CYCLESHIFT','STARTTIME','PAYLOADACT','MTDISTANCE','LDDISTANCE','TOTDISTANCE'];
+let charts=[];
+const drop=document.getElementById('drop'), fileIn=document.getElementById('file'), st=document.getElementById('status');
+
+drop.addEventListener('click',()=>fileIn.click());
+drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('over');});
+drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
+drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('over');if(e.dataTransfer.files[0])loadFile(e.dataTransfer.files[0]);});
+fileIn.addEventListener('change',()=>{if(fileIn.files[0])loadFile(fileIn.files[0]);});
+
+function setStatus(msg,err){ st.textContent=msg; st.className='status'+(err?' err':''); }
+
+function loadFile(f){
+  setStatus('Membaca '+f.name+'...');
+  const rd=new FileReader();
+  rd.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{defval:null});
+      if(!rows.length) throw new Error('Sheet pertama kosong.');
+      const have=Object.keys(rows[0]);
+      const missing=REQUIRED.filter(c=>!have.includes(c));
+      if(missing.length) throw new Error('Kolom tidak ditemukan: '+missing.join(', ')+'. Pastikan header ada di baris pertama.');
+      const res=computeAll(rows);
+      if(!res.summary.total_cycles) throw new Error('Tidak ada baris dengan TYPE = "Truck" di file ini.');
+      render(res, rows);
+      setStatus(f.name+' - '+res.summary.total_cycles.toLocaleString('id-ID')+' cycle truck, '+res.summary.total_units+' unit. Muat file lain kapan saja.');
+      drop.classList.add('small');
+      document.getElementById('dropTxt').innerHTML='<b>Muat file lain</b> (tarik ke sini atau klik)';
+    }catch(err){ setStatus('Gagal: '+err.message,true); }
+  };
+  rd.readAsArrayBuffer(f);
+}
+
+function excelDate(v){
+  if(typeof v==='number') return new Date(Math.round((v-25569)*86400*1000));
+  const d=new Date(v); return isNaN(d)?null:d;
+}
+function render(res, rows){
+  const S=res.summary, U=res.units;
+  const fmt=n=>n.toLocaleString('id-ID');
+  // periode dari CYCLEDATE
+  const dates=rows.map(r=>excelDate(r.CYCLEDATE)).filter(d=>d&&d.getFullYear()>2000);
+  const bp=document.getElementById('badgePeriod');
+  if(dates.length){
+    const mn=new Date(Math.min(...dates)), mx=new Date(Math.max(...dates));
+    const f=d=>d.toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
+    bp.textContent = mn.toDateString()===mx.toDateString()? f(mn) : f(mn)+' - '+f(mx);
+    bp.style.display='';
+  } else bp.style.display='none';
+
+  document.getElementById('dash').style.display='block';
+  charts.forEach(c=>c.destroy()); charts=[];
+
+  const KCOLOR={'Takang Total STATUS':'#a11212','Takang Total GPS':'#d92626','Takang Berat STATUS':'#ED7D31','Takang Berat GPS':'#FFC000','Intermiten':'#f0d264','Sehat':'#1f9d55'};
+  const KPILL={'Takang Total STATUS':'p-tts','Takang Total GPS':'p-ttg','Takang Berat STATUS':'p-tbs','Takang Berat GPS':'p-tbg','Intermiten':'p-int','Sehat':'p-seh'};
+  const TIND={'Takang Total STATUS':'GPS sehat - cek sensor deteksi muatan, JANGAN ganti GPS','Takang Total GPS':'Perangkat GPS kemungkinan mati total - prioritas tertinggi','Takang Berat STATUS':'Cek sensor deteksi muatan / status cycle','Takang Berat GPS':'Cek antena/receiver GPS','Intermiten':'Pantau - gangguan sinyal sesekali'};
+
+  const nTakang=U.filter(x=>x.k.includes('Takang')).length;
+  const nLayak=U.filter(x=>x.dl==='Layak').length;
+  const nCond=U.filter(x=>x.dl==='Layak Bersyarat').length;
+  const pctBad=S.total_cycles?(S.bad/S.total_cycles*100).toFixed(1):'0';
+  const nP=p=>U.filter(x=>x.pr===p).length;
+  document.getElementById('kpis').innerHTML=[
+   ['Total hauler aktif',fmt(S.total_units),'terekam pada periode data'],
+   ['Cycle truck',fmt(S.total_cycles),'DS '+fmt(S.ds_cycles)+' &middot; NS '+fmt(S.ns_cycles)],
+   ['Cycle bermasalah',fmt(S.bad)+' <span style="font-size:15px;color:var(--red)">('+pctBad+'%)</span>','GPS '+fmt(S.gps)+' &middot; takang status '+fmt(S.status)],
+   ['Unit perlu perbaikan',nTakang,'P1: '+nP('P1')+' &middot; P2: '+nP('P2')+' &middot; P3: '+nP('P3')],
+   ['Layak Dynamic Loading',nLayak+' <span style="font-size:15px;color:var(--amber)">+'+nCond+' bersyarat</span>','dari '+S.total_units+' unit']
+  ].map(x=>'<div class="kpi"><div class="lbl">'+x[0]+'</div><div class="val">'+x[1]+'</div><div class="det">'+x[2]+'</div></div>').join('');
+
+  const kOrder=['Sehat','Intermiten','Takang Berat GPS','Takang Berat STATUS','Takang Total GPS','Takang Total STATUS'];
+  charts.push(new Chart(chDonut,{type:'doughnut',
+   data:{labels:kOrder,datasets:[{data:kOrder.map(k=>U.filter(x=>x.k===k).length),backgroundColor:kOrder.map(k=>KCOLOR[k]),borderWidth:2,borderColor:'#fff'}]},
+   options:{plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11}}}},cutout:'55%'}}));
+  charts.push(new Chart(chDL,{type:'bar',
+   data:{labels:['Layak','Layak Bersyarat','Tidak Layak'],datasets:[{data:[nLayak,nCond,U.length-nLayak-nCond],backgroundColor:['#1f9d55','#e8a800','#d92626'],borderRadius:6}]},
+   options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{precision:0}}}}}));
+  charts.push(new Chart(chErr,{type:'bar',
+   data:{labels:['Shift DS','Shift NS'],datasets:[
+    {label:'Cycle sehat',data:[S.ds_cycles-S.ds_bad,S.ns_cycles-S.ns_bad],backgroundColor:'#1f9d55',borderRadius:4},
+    {label:'Cycle bermasalah',data:[S.ds_bad,S.ns_bad],backgroundColor:'#d92626',borderRadius:4}]},
+   options:{plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11}}}},scales:{x:{stacked:true},y:{stacked:true,ticks:{precision:0}}}}}));
+
+  const prOrder={P1:1,P2:2,P3:3,P4:4};
+  const pr=U.filter(x=>x.pr).sort((a,b)=>prOrder[a.pr]-prOrder[b.pr]||b.b-a.b);
+  document.querySelector('#tblPr tbody').innerHTML=pr.map((x,i)=>
+   '<tr><td>'+(i+1)+'</td><td><span class="pr-badge pr-'+x.pr+'">'+x.pr+'</span></td><td><b>'+x.u+'</b></td>'+
+   '<td><span class="pill '+KPILL[x.k]+'">'+x.k+'</span></td><td>'+x.c+'</td><td>'+x.b+'</td><td>'+x.p.toFixed(1)+'%</td><td>'+x.run+'</td>'+
+   '<td style="font-size:12px;color:var(--muted)">'+(TIND[x.k]||'')+'</td></tr>').join('');
+
+  const fk=document.getElementById('fk');
+  fk.innerHTML='<option value="">Semua klasifikasi</option>';
+  kOrder.forEach(k=>{const o=document.createElement('option');o.textContent=k;fk.appendChild(o);});
+  let sortKey='p',sortDir=-1;
+  function renderU(){
+    const q=document.getElementById('q').value.toUpperCase();
+    const vk=fk.value,vd=document.getElementById('fd').value;
+    let rws=U.filter(x=>(!q||x.u.toUpperCase().includes(q))&&(!vk||x.k===vk)&&(!vd||x.dl===vd));
+    rws.sort((a,b)=>{const va=a[sortKey],vb=b[sortKey];return (typeof va==='string'?va.localeCompare(vb):va-vb)*sortDir;});
+    document.querySelector('#tblU tbody').innerHTML=rws.map(x=>
+     '<tr><td><b>'+x.u+'</b></td><td style="font-size:12px">'+x.kls+'</td><td>'+x.c+'</td><td>'+x.b+'</td>'+
+     '<td>'+x.p.toFixed(1)+'%</td><td>'+x.run+'</td><td>'+x.g+'</td><td>'+x.s+'</td>'+
+     '<td><span class="pill '+KPILL[x.k]+'">'+x.k+'</span></td>'+
+     '<td><span class="pill '+(x.dl==='Layak'?'d-ok':x.dl==='Layak Bersyarat'?'d-cond':'d-no')+'">'+x.dl+'</span></td>'+
+     '<td>'+(x.pr?'<span class="pr-badge pr-'+x.pr+'">'+x.pr+'</span>':'-')+'</td></tr>').join('');
+  }
+  document.getElementById('q').oninput=renderU;
+  fk.onchange=renderU;
+  document.getElementById('fd').onchange=renderU;
+  document.querySelectorAll('#tblU th').forEach(th=>th.onclick=()=>{
+    const k=th.dataset.s;if(!k)return;
+    if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=-1;}
+    renderU();
+  });
+  renderU();
+}
+</script>
+</body>
+</html>
