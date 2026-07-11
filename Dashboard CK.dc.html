@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0;background:#c9d3e0;}
+a{color:#1B4080;} a:hover{color:#122c5c;}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+</helmet>
+
+<div style="min-height:100vh;position:relative;color:#1a2332;font-family:'Barlow','Segoe UI',system-ui,sans-serif;">
+
+  <!-- Blurred photo background -->
+  <div style="position:fixed;inset:-40px;background-image:url('assets/ck-bg2.png');background-size:cover;background-position:center 25%;filter:blur(18px);transform:scale(1.06);z-index:0;"></div>
+  <div style="position:fixed;inset:0;background:rgba(238,241,246,0.7);z-index:0;"></div>
+
+  <div style="position:relative;z-index:1;">
+
+  <!-- Top brand bar -->
+  <div data-screen-label="Header" style="background:#ffffff;border-bottom:4px solid #1B4080;padding:12px 28px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+    <img src="assets/ck-logo.jpg" alt="Cipta Kridatama" style="height:58px;width:auto;display:block;">
+    <div style="width:1px;height:46px;background:#e2e8f0;"></div>
+    <div style="flex:1;min-width:260px;">
+      <div style="font-size:21px;font-weight:800;color:#1B4080;letter-spacing:.2px;">MineStar Hauler Condition Monitor</div>
+      <div style="font-size:13px;color:#64748b;margin-top:2px;">Kondisi MineStar Hauler · Prioritas perbaikan · Rekomendasi Hauler untuk Dynamic Loading</div>
+    </div>
+    <sc-if value="{{period}}" hint-placeholder-val="{{false}}">
+      <div style="background:#1B4080;color:#ffffff;padding:7px 16px;border-radius:20px;font-size:13px;font-weight:600;">{{period}}</div>
+    </sc-if>
+  </div>
+
+  <div style="max-width:1280px;margin:0 auto;padding:24px;">
+
+    <!-- Drop zone -->
+    <div onClick="{{onDropClick}}" onDrop="{{onDrop}}" onDragOver="{{onDragOver}}" onDragLeave="{{onDragLeave}}" style="border:2px dashed #1B4080;border-radius:12px;background:{{dropBg}};padding:{{dropPad}};text-align:center;cursor:pointer;margin-bottom:20px;">
+      <div style="font-size:15px;"><b style="color:#1B4080;">{{dropTitle}}</b> {{dropSub}}</div>
+      <sc-if value="{{showHints}}" hint-placeholder-val="{{true}}">
+        <div style="font-size:12px;color:#64748b;margin-top:6px;max-width:900px;margin-left:auto;margin-right:auto;">Format: .xlsx / .csv — minimal berisi kolom TYPE, FIRSTMACHINE, FIRSTMACHINECLASS, CYCLESHIFT, CYCLEDATE, STARTTIME, SOURCE/ASGNSOURCE, SINK/ASGNSINK, PAYLOADACT, MTDISTANCE, LDDISTANCE, TOTDISTANCE</div>
+        <div style="font-size:12px;color:#1f9d55;margin-top:8px;">File diproses sepenuhnya di browser Anda — tidak ada data yang terkirim ke internet.</div>
+      </sc-if>
+      <sc-if value="{{status}}" hint-placeholder-val="{{false}}">
+        <div style="font-size:13px;margin-top:8px;font-weight:600;color:{{statusColor}};">{{status}}</div>
+      </sc-if>
+      <input type="file" accept=".xlsx,.xls,.csv" ref="{{fileRef}}" onChange="{{onFile}}" style="display:none;">
+    </div>
+
+    <sc-if value="{{loaded}}" hint-placeholder-val="{{false}}">
+    <div data-screen-label="Dashboard">
+
+      <!-- KPIs -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:20px;">
+        <sc-for list="{{kpis}}" as="k" hint-placeholder-count="5">
+          <div style="background:#ffffff;border:1px solid #e2e8f0;border-top:3px solid #1B4080;border-radius:10px;padding:16px 18px;box-shadow:0 1px 2px rgba(16,32,64,.05);">
+            <div style="font-size:11.5px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;font-weight:600;">{{k.lbl}}</div>
+            <div style="font-size:30px;font-weight:800;margin-top:4px;color:#1a2332;">{{k.val}} <span style="font-size:15px;font-weight:700;color:{{k.extraColor}};">{{k.extra}}</span></div>
+            <div style="font-size:12px;color:#64748b;margin-top:2px;">{{k.det}}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- Charts -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-bottom:20px;">
+        <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:18px;box-shadow:0 1px 2px rgba(16,32,64,.05);">
+          <div style="font-size:14px;font-weight:700;color:#1B4080;margin-bottom:12px;">Komposisi klasifikasi fleet</div>
+          {{donutEl}}
+        </div>
+        <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:18px;box-shadow:0 1px 2px rgba(16,32,64,.05);">
+          <div style="font-size:14px;font-weight:700;color:#1B4080;margin-bottom:12px;">Kesiapan Dynamic Loading</div>
+          {{dlEl}}
+        </div>
+        <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:18px;box-shadow:0 1px 2px rgba(16,32,64,.05);">
+          <div style="font-size:14px;font-weight:700;color:#1B4080;margin-bottom:12px;">Jenis error &amp; breakdown shift</div>
+          {{errEl}}
+        </div>
+      </div>
+
+      <!-- Priority table -->
+      <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:18px;box-shadow:0 1px 2px rgba(16,32,64,.05);margin-bottom:20px;">
+        <div style="font-size:14px;font-weight:700;color:#1B4080;margin-bottom:12px;">Skala prioritas perbaikan MineStar</div>
+        <div style="max-height:360px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;">
+          <div style="min-width:1050px;">
+            <div style="display:grid;grid-template-columns:44px 76px 120px 210px 70px 100px 70px 60px minmax(240px,1fr);gap:0;background:#1B4080;color:#ffffff;font-size:12.5px;font-weight:700;position:sticky;top:0;z-index:1;">
+              <div style="padding:9px 10px;">No</div><div style="padding:9px 10px;">Prioritas</div><div style="padding:9px 10px;">Unit</div><div style="padding:9px 10px;">Klasifikasi</div><div style="padding:9px 10px;">Cycle</div><div style="padding:9px 10px;">Bermasalah</div><div style="padding:9px 10px;">%</div><div style="padding:9px 10px;">Run</div><div style="padding:9px 10px;">Tindakan</div>
+            </div>
+            <sc-for list="{{prRows}}" as="r" hint-placeholder-count="4">
+              <div style="display:grid;grid-template-columns:44px 76px 120px 210px 70px 100px 70px 60px minmax(240px,1fr);align-items:center;font-size:13px;border-bottom:1px solid #e2e8f0;" style-hover="background:#f0f4f9;">
+                <div style="padding:{{cellPad}} 10px;">{{r.no}}</div>
+                <div style="padding:{{cellPad}} 10px;"><span style="display:inline-block;min-width:34px;text-align:center;padding:2px 8px;border-radius:6px;font-weight:700;font-size:12px;background:{{r.prBg}};color:{{r.prFg}};">{{r.pr}}</span></div>
+                <div style="padding:{{cellPad}} 10px;font-weight:700;">{{r.u}}</div>
+                <div style="padding:{{cellPad}} 10px;"><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:11.5px;font-weight:600;white-space:nowrap;background:{{r.kBg}};color:{{r.kFg}};">{{r.k}}</span></div>
+                <div style="padding:{{cellPad}} 10px;">{{r.c}}</div>
+                <div style="padding:{{cellPad}} 10px;">{{r.b}}</div>
+                <div style="padding:{{cellPad}} 10px;">{{r.p}}</div>
+                <div style="padding:{{cellPad}} 10px;">{{r.run}}</div>
+                <div style="padding:{{cellPad}} 10px;font-size:12px;color:#64748b;">{{r.tind}}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <!-- Unit detail table -->
+      <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:18px;box-shadow:0 1px 2px rgba(16,32,64,.05);">
+        <div style="font-size:14px;font-weight:700;color:#1B4080;margin-bottom:12px;">Detail semua unit</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+          <input type="text" placeholder="Cari unit... (mis. CO4208)" value="{{q}}" onChange="{{onQ}}" style="flex:1;min-width:180px;padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;background:#ffffff;color:#1a2332;font-family:inherit;">
+          <select value="{{fk}}" onChange="{{onFk}}" style="padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;background:#ffffff;color:#1a2332;font-family:inherit;">
+            <option value="">Semua klasifikasi</option>
+            <option value="Sehat">Sehat</option>
+            <option value="Intermiten">Intermiten</option>
+            <option value="Takang Berat GPS">Takang Berat GPS</option>
+            <option value="Takang Berat STATUS">Takang Berat STATUS</option>
+            <option value="Takang Total GPS">Takang Total GPS</option>
+            <option value="Takang Total STATUS">Takang Total STATUS</option>
+          </select>
+          <select value="{{fd}}" onChange="{{onFd}}" style="padding:8px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;background:#ffffff;color:#1a2332;font-family:inherit;">
+            <option value="">Semua status DL</option>
+            <option value="Layak">Layak</option>
+            <option value="Layak Bersyarat">Layak Bersyarat</option>
+            <option value="Tidak Layak">Tidak Layak</option>
+          </select>
+        </div>
+        <div style="max-height:480px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;">
+          <div style="min-width:1150px;">
+            <div style="display:grid;grid-template-columns:110px 130px 66px 100px 72px 60px 60px 66px 190px minmax(130px,1fr) 86px;background:#1B4080;color:#ffffff;font-size:12.5px;font-weight:700;position:sticky;top:0;z-index:1;">
+              <sc-for list="{{cols}}" as="col" hint-placeholder-count="11">
+                <div onClick="{{col.onSort}}" style="padding:9px 10px;cursor:pointer;user-select:none;white-space:nowrap;">{{col.label}}{{col.arrow}}</div>
+              </sc-for>
+            </div>
+            <sc-for list="{{uRows}}" as="r" hint-placeholder-count="6">
+              <div style="display:grid;grid-template-columns:110px 130px 66px 100px 72px 60px 60px 66px 190px minmax(130px,1fr) 86px;align-items:center;font-size:13px;border-bottom:1px solid #e2e8f0;" style-hover="background:#f0f4f9;">
+                <div style="padding:{{cellPad}} 10px;font-weight:700;">{{r.u}}</div>
+                <div style="padding:{{cellPad}} 10px;font-size:12px;">{{r.kls}}</div>
+                <div style="padding:{{cellPad}} 10px;">{{r.c}}</div>
+                <div style="padding:{{cellPad}} 10px;">{{r.b}}</div>
+                <div style="padding:{{cellPad}} 10px;">{{r.p}}</div>
+                <div style="padding:{{cellPad}} 10px;">{{r.run}}</div>
+                <div style="padding:{{cellPad}} 10px;">{{r.g}}</div>
+                <div style="padding:{{cellPad}} 10px;">{{r.s}}</div>
+                <div style="padding:{{cellPad}} 10px;"><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:11.5px;font-weight:600;white-space:nowrap;background:{{r.kBg}};color:{{r.kFg}};">{{r.k}}</span></div>
+                <div style="padding:{{cellPad}} 10px;"><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:11.5px;font-weight:600;white-space:nowrap;background:{{r.dlBg}};color:{{r.dlFg}};">{{r.dl}}</span></div>
+                <div style="padding:{{cellPad}} 10px;"><span style="display:inline-block;min-width:34px;text-align:center;padding:2px 8px;border-radius:6px;font-weight:700;font-size:12px;background:{{r.prBg}};color:{{r.prFg}};">{{r.prTxt}}</span></div>
+              </div>
+            </sc-for>
+            <sc-if value="{{noRows}}" hint-placeholder-val="{{false}}">
+              <div style="padding:24px;text-align:center;color:#64748b;font-size:13px;">Tidak ada unit yang cocok dengan filter.</div>
+            </sc-if>
+          </div>
+        </div>
+        <div style="font-size:12px;color:#64748b;font-style:italic;margin-top:16px;">Klasifikasi dari file yang dimuat — keputusan final perbaikan dan pool Dynamic Loading sebaiknya dari 5–7 hari data. Rekomendasi DL murni dari kualitas telemetri; kondisi mekanis unit tetap perlu diverifikasi.</div>
+      </div>
+
+    </div>
+    </sc-if>
+
+    <sc-if value="{{showMethod}}" hint-placeholder-val="{{true}}">
+      <div style="font-size:11px;color:#64748b;margin-top:24px;text-align:center;">Metode 4 lapis: uji cycle (kosong / salah nilai vs median rute / takang status) → uji rute-vs-unit → klasifikasi unit (persentase + run beruntun) → jenis kerusakan dominan</div>
+    </sc-if>
+    <div style="font-size:11px;color:#94a3b8;margin-top:8px;text-align:center;font-weight:600;">PT Cipta Kridatama — Mining Services</div>
+  </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;demoData&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Data&quot;},&quot;dense&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Tampilan&quot;},&quot;showMethod&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Tampilan&quot;}}">
+class Component extends DCLogic {
+  state = { loaded:false, isDemo:false, status:'', statusErr:false, over:false, small:false, period:'',
+            S:null, U:[], q:'', fk:'', fd:'', sortKey:'p', sortDir:-1 };
+
+  // ---------- helpers ----------
+  median(arr){
+    if(!arr.length) return null;
+    const a=[...arr].sort((x,y)=>x-y), m=Math.floor(a.length/2);
+    return a.length%2 ? a[m] : (a[m-1]+a[m])/2;
+  }
+  num(v){ const n=Number(v); return isFinite(n)? n : 0; }
+  excelDate(v){
+    if(typeof v==='number') return new Date(Math.round((v-25569)*86400*1000));
+    const d=new Date(v); return isNaN(d)?null:d;
+  }
+
+  computeAll(rows){
+    const num=this.num, median=this.median;
+    const trucks=[];
+    for(const r of rows){
+      if(r.TYPE!=='Truck') continue;
+      const src=(r.SOURCE!=null&&r.SOURCE!=='')?r.SOURCE:((r.ASGNSOURCE!=null&&r.ASGNSOURCE!=='')?r.ASGNSOURCE:'nan');
+      const snk=(r.SINK!=null&&r.SINK!=='')?r.SINK:((r.ASGNSINK!=null&&r.ASGNSINK!=='')?r.ASGNSINK:'nan');
+      trucks.push({
+        u:String(r.FIRSTMACHINE||''), kls:String(r.FIRSTMACHINECLASS||''),
+        shift:String(r.CYCLESHIFT||''), start:num(r.STARTTIME), date:r.CYCLEDATE,
+        route:src+' -> '+snk, mt:num(r.MTDISTANCE), ld:num(r.LDDISTANCE),
+        tot:(r.TOTDISTANCE!=null&&r.TOTDISTANCE!==''&&isFinite(Number(r.TOTDISTANCE)))?Number(r.TOTDISTANCE):null,
+        prod:num(r.PAYLOADACT)>0
+      });
+    }
+    const rt={};
+    for(const c of trucks){
+      if(c.mt>0&&c.ld>0){
+        (rt[c.route]=rt[c.route]||{mt:[],ld:[],tot:[]});
+        rt[c.route].mt.push(c.mt); rt[c.route].ld.push(c.ld);
+        if(c.tot!=null) rt[c.route].tot.push(c.tot);
+      }
+    }
+    const rstat={};
+    for(const k in rt) rstat[k]={medMT:median(rt[k].mt),medLD:median(rt[k].ld),medTOT:median(rt[k].tot),n:rt[k].mt.length};
+    for(const c of trucks){
+      const s=rstat[c.route];
+      let err='OK';
+      if(c.ld<=0&&s&&s.medTOT!=null&&s.medTOT>0&&c.mt>=0.75*s.medTOT) err='STATUS';
+      else if(c.prod&&(c.mt<=0||c.ld<=0)) err='GPS';
+      else if(s&&s.n>=5){
+        for(const [v,m] of [[c.mt,s.medMT],[c.ld,s.medLD]]){
+          if(v>0&&m>0&&(v<0.4*m||v>2.5*m)){ err='GPS'; break; }
+        }
+      }
+      c.err=err; c.bad=err!=='OK';
+    }
+    const byUnit={};
+    for(const c of trucks)(byUnit[c.u]=byUnit[c.u]||[]).push(c);
+    const units=[];
+    for(const u in byUnit){
+      const g=byUnit[u].slice().sort((a,b)=>a.start-b.start);
+      const n=g.length, b=g.filter(x=>x.bad).length, p=b/n*100;
+      let run=0,mx=0;
+      for(const x of g){ run=x.bad?run+1:0; if(run>mx)mx=run; }
+      const ng=g.filter(x=>x.err==='GPS').length, ns=g.filter(x=>x.err==='STATUS').length;
+      const dom=ng>=ns?'GPS':'STATUS';
+      let k;
+      if(p>=95) k='Takang Total '+dom;
+      else if(p>30||mx>=5) k='Takang Berat '+dom;
+      else if(p>5) k='Intermiten';
+      else k='Sehat';
+      const dl=k==='Sehat'?'Layak':(k==='Intermiten'&&p<=15&&mx<3?'Layak Bersyarat':'Tidak Layak');
+      units.push({u, kls:g[0].kls, c:n, b, p:Math.round(p*10)/10, run:mx, g:ng, s:ns, k,
+        ds:g.filter(x=>x.shift==='DS').length, ns2:g.filter(x=>x.shift==='NS').length,
+        bds:g.filter(x=>x.shift==='DS'&&x.bad).length, bns:g.filter(x=>x.shift==='NS'&&x.bad).length, dl});
+    }
+    const medC=median(units.map(x=>x.c));
+    for(const x of units){
+      if(x.k.startsWith('Takang Total')) x.pr='P1';
+      else if(x.k.startsWith('Takang Berat')) x.pr=x.c>=medC?'P2':'P3';
+      else if(x.k==='Intermiten') x.pr='P4';
+      else x.pr='';
+      x.ns=x.ns2; delete x.ns2;
+    }
+    units.sort((a,b)=>a.u.localeCompare(b.u));
+    const S={
+      total_units:units.length, total_cycles:trucks.length,
+      bad:trucks.filter(x=>x.bad).length,
+      gps:trucks.filter(x=>x.err==='GPS').length,
+      status:trucks.filter(x=>x.err==='STATUS').length,
+      ds_cycles:trucks.filter(x=>x.shift==='DS').length,
+      ns_cycles:trucks.filter(x=>x.shift==='NS').length,
+      ds_bad:trucks.filter(x=>x.shift==='DS'&&x.bad).length,
+      ns_bad:trucks.filter(x=>x.shift==='NS'&&x.bad).length,
+      median_cycles:medC
+    };
+    return {summary:S, units};
+  }
+
+  // ---------- demo data ----------
+  componentDidMount(){
+    if((this.props.demoData ?? true) && !this.state.loaded) this.loadDemo();
+  }
+  loadDemo(){
+    let seed=42;
+    const rand=()=>{ seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff; };
+    const routes=[
+      {s:'PIT BARAT RL60', k:'DISPOSAL NORTH', d:2400},
+      {s:'PIT BARAT RL75', k:'DISPOSAL NORTH', d:3100},
+      {s:'PIT TIMUR RL45', k:'CRUSHER 01', d:1800},
+      {s:'PIT TIMUR RL30', k:'STOCKPILE ROM', d:2700}
+    ];
+    // profil unit: [jumlah, tipe error, peluang error]
+    const profiles=[
+      ['SEHAT',12,'GPS',0.02], ['INTERMITEN',5,'GPS',0.10],
+      ['BERAT_GPS',3,'GPS',0.45], ['BERAT_STS',2,'STATUS',0.50],
+      ['TOTAL_GPS',2,'GPS',1.0], ['TOTAL_STS',1,'STATUS',1.0]
+    ];
+    const rows=[]; let un=4201;
+    const dates=['2026-07-08','2026-07-09','2026-07-10'];
+    for(const [prof,count,etype,pe] of profiles){
+      for(let i=0;i<count;i++){
+        const unit='CO'+(un++);
+        const kls=un%3===0?'CAT 775G':'CAT 777E';
+        const nc=22+Math.floor(rand()*16);
+        for(let c=0;c<nc;c++){
+          const rt=routes[Math.floor(rand()*routes.length)];
+          const shift=rand()<0.55?'DS':'NS';
+          const date=dates[Math.floor(rand()*dates.length)];
+          const mtB=rt.d*(0.92+rand()*0.16), ldB=rt.d*(0.95+rand()*0.14);
+          const bad=rand()<pe;
+          let mt=Math.round(mtB), ld=Math.round(ldB), tot=Math.round(mtB+ldB);
+          if(bad){
+            if(etype==='GPS'){ mt=0; ld=0; }
+            else { ld=0; mt=Math.round((mtB+ldB)*0.92); tot=Math.round(mtB+ldB); }
+          }
+          rows.push({TYPE:'Truck', FIRSTMACHINE:unit, FIRSTMACHINECLASS:kls,
+            CYCLESHIFT:shift, CYCLEDATE:date, STARTTIME:c*1000+Math.floor(rand()*900),
+            SOURCE:rt.s, SINK:rt.k, PAYLOADACT:88+Math.round(rand()*22),
+            MTDISTANCE:mt, LDDISTANCE:ld, TOTDISTANCE:tot});
+        }
+      }
+    }
+    const res=this.computeAll(rows);
+    this.setState({
+      loaded:true, isDemo:true, small:true, period:'8 Juli 2026 - 10 Juli 2026',
+      S:res.summary, U:res.units,
+      status:'Menampilkan CONTOH DATA ('+res.summary.total_cycles.toLocaleString('id-ID')+' cycle, '+res.summary.total_units+' unit). Muat file export MineStar Anda untuk data aktual.',
+      statusErr:false
+    }, ()=>this.rebuildCharts());
+  }
+
+  // ---------- file loading ----------
+  loadFile(f){
+    const REQUIRED=['TYPE','FIRSTMACHINE','CYCLESHIFT','STARTTIME','PAYLOADACT','MTDISTANCE','LDDISTANCE','TOTDISTANCE'];
+    this.setState({status:'Membaca '+f.name+'...', statusErr:false});
+    const rd=new FileReader();
+    rd.onload=e=>{
+      try{
+        const wb=XLSX.read(e.target.result,{type:'array'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const rows=XLSX.utils.sheet_to_json(ws,{defval:null});
+        if(!rows.length) throw new Error('Sheet pertama kosong.');
+        const have=Object.keys(rows[0]);
+        const missing=REQUIRED.filter(c=>!have.includes(c));
+        if(missing.length) throw new Error('Kolom tidak ditemukan: '+missing.join(', ')+'. Pastikan header ada di baris pertama.');
+        const res=this.computeAll(rows);
+        if(!res.summary.total_cycles) throw new Error('Tidak ada baris dengan TYPE = "Truck" di file ini.');
+        const ds=rows.map(r=>this.excelDate(r.CYCLEDATE)).filter(d=>d&&d.getFullYear()>2000);
+        let period='';
+        if(ds.length){
+          const mn=new Date(Math.min(...ds)), mx=new Date(Math.max(...ds));
+          const fd=d=>d.toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
+          period=mn.toDateString()===mx.toDateString()?fd(mn):fd(mn)+' - '+fd(mx);
+        }
+        this.setState({
+          loaded:true, isDemo:false, small:true, period, S:res.summary, U:res.units,
+          status:f.name+' - '+res.summary.total_cycles.toLocaleString('id-ID')+' cycle truck, '+res.summary.total_units+' unit. Muat file lain kapan saja.',
+          statusErr:false
+        }, ()=>this.rebuildCharts());
+      }catch(err){ this.setState({status:'Gagal: '+err.message, statusErr:true}); }
+    };
+    rd.readAsArrayBuffer(f);
+  }
+
+  // ---------- charts ----------
+  chartEl(key){
+    this._els=this._els||{}; this._canvas=this._canvas||{}; this._charts=this._charts||{};
+    if(!this._els[key]){
+      this._els[key]=React.createElement('div',{key, style:{height:'250px', position:'relative'}},
+        React.createElement('canvas',{ref:el=>{ this._canvas[key]=el; if(el) this.buildChart(key); }}));
+    }
+    return this._els[key];
+  }
+  buildChart(key){
+    const el=this._canvas&&this._canvas[key];
+    if(!el||!this.state.S||!window.Chart) return;
+    if(this._charts[key]) this._charts[key].destroy();
+    this._charts[key]=new Chart(el, this.chartCfg(key));
+  }
+  rebuildCharts(){
+    if(!window.Chart){ setTimeout(()=>this.rebuildCharts(),300); return; }
+    ['donut','dl','err'].forEach(k=>this.buildChart(k));
+  }
+  chartCfg(key){
+    const S=this.state.S, U=this.state.U;
+    const KCOLOR={'Takang Total STATUS':'#a11212','Takang Total GPS':'#d92626','Takang Berat STATUS':'#ED7D31','Takang Berat GPS':'#FFC000','Intermiten':'#f0d264','Sehat':'#1f9d55'};
+    const kOrder=['Sehat','Intermiten','Takang Berat GPS','Takang Berat STATUS','Takang Total GPS','Takang Total STATUS'];
+    const nLayak=U.filter(x=>x.dl==='Layak').length;
+    const nCond=U.filter(x=>x.dl==='Layak Bersyarat').length;
+    if(key==='donut') return {type:'doughnut',
+      data:{labels:kOrder,datasets:[{data:kOrder.map(k=>U.filter(x=>x.k===k).length),backgroundColor:kOrder.map(k=>KCOLOR[k]),borderWidth:2,borderColor:'#fff'}]},
+      options:{maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11,family:'Barlow'}}}},cutout:'55%'}};
+    if(key==='dl') return {type:'bar',
+      data:{labels:['Layak','Layak Bersyarat','Tidak Layak'],datasets:[{data:[nLayak,nCond,U.length-nLayak-nCond],backgroundColor:['#1f9d55','#e8a800','#d92626'],borderRadius:6}]},
+      options:{maintainAspectRatio:false,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{precision:0}}}}};
+    return {type:'bar',
+      data:{labels:['Shift DS','Shift NS'],datasets:[
+        {label:'Cycle sehat',data:[S.ds_cycles-S.ds_bad,S.ns_cycles-S.ns_bad],backgroundColor:'#1f9d55',borderRadius:4},
+        {label:'Cycle bermasalah',data:[S.ds_bad,S.ns_bad],backgroundColor:'#d92626',borderRadius:4}]},
+      options:{maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11,family:'Barlow'}}}},scales:{x:{stacked:true},y:{stacked:true,ticks:{precision:0}}}}};
+  }
+
+  // ---------- render ----------
+  renderVals(){
+    const st=this.state, S=st.S, U=st.U;
+    const fmt=n=>n.toLocaleString('id-ID');
+    const dense=this.props.dense ?? false;
+    const cellPad=dense?'4px':'7px';
+    const showMethod=this.props.showMethod ?? true;
+
+    const KPILL={'Takang Total STATUS':['#a11212','#ffffff'],'Takang Total GPS':['#d92626','#ffffff'],
+      'Takang Berat STATUS':['#ED7D31','#ffffff'],'Takang Berat GPS':['#FFC000','#5a4300'],
+      'Intermiten':['#fdf3d7','#7a5c00'],'Sehat':['#e6f4ec','#1f9d55']};
+    const PRC={P1:['#a11212','#ffffff'],P2:['#d92626','#ffffff'],P3:['#ED7D31','#ffffff'],P4:['#fdf3d7','#7a5c00']};
+    const DLC={'Layak':['#e6f4ec','#1f9d55'],'Layak Bersyarat':['#fdf3d7','#7a5c00'],'Tidak Layak':['#fdeaea','#d92626']};
+    const TIND={'Takang Total STATUS':'GPS sehat - cek sensor deteksi muatan, JANGAN ganti GPS',
+      'Takang Total GPS':'Perangkat GPS kemungkinan mati total - prioritas tertinggi',
+      'Takang Berat STATUS':'Cek sensor deteksi muatan / status cycle',
+      'Takang Berat GPS':'Cek antena/receiver GPS',
+      'Intermiten':'Pantau - gangguan sinyal sesekali'};
+
+    let kpis=[], prRows=[], uRows=[], noRows=false;
+    if(S){
+      const nTakang=U.filter(x=>x.k.includes('Takang')).length;
+      const nLayak=U.filter(x=>x.dl==='Layak').length;
+      const nCond=U.filter(x=>x.dl==='Layak Bersyarat').length;
+      const pctBad=S.total_cycles?(S.bad/S.total_cycles*100).toFixed(1):'0';
+      const nP=p=>U.filter(x=>x.pr===p).length;
+      kpis=[
+        {lbl:'Total hauler aktif', val:fmt(S.total_units), extra:'', extraColor:'#64748b', det:'terekam pada periode data'},
+        {lbl:'Cycle truck', val:fmt(S.total_cycles), extra:'', extraColor:'#64748b', det:'DS '+fmt(S.ds_cycles)+' · NS '+fmt(S.ns_cycles)},
+        {lbl:'Cycle bermasalah', val:fmt(S.bad), extra:'('+pctBad+'%)', extraColor:'#d92626', det:'GPS '+fmt(S.gps)+' · takang status '+fmt(S.status)},
+        {lbl:'Unit perlu perbaikan', val:String(nTakang), extra:'', extraColor:'#64748b', det:'P1: '+nP('P1')+' · P2: '+nP('P2')+' · P3: '+nP('P3')},
+        {lbl:'Layak Dynamic Loading', val:String(nLayak), extra:'+'+nCond+' bersyarat', extraColor:'#e8a800', det:'dari '+S.total_units+' unit'}
+      ];
+      const prOrder={P1:1,P2:2,P3:3,P4:4};
+      prRows=U.filter(x=>x.pr).sort((a,b)=>prOrder[a.pr]-prOrder[b.pr]||b.b-a.b).map((x,i)=>({
+        no:i+1, pr:x.pr, prBg:PRC[x.pr][0], prFg:PRC[x.pr][1],
+        u:x.u, k:x.k, kBg:KPILL[x.k][0], kFg:KPILL[x.k][1],
+        c:x.c, b:x.b, p:x.p.toFixed(1)+'%', run:x.run, tind:TIND[x.k]||''
+      }));
+      const q=st.q.toUpperCase();
+      let rws=U.filter(x=>(!q||x.u.toUpperCase().includes(q))&&(!st.fk||x.k===st.fk)&&(!st.fd||x.dl===st.fd));
+      rws=rws.slice().sort((a,b)=>{
+        const va=a[st.sortKey], vb=b[st.sortKey];
+        return (typeof va==='string'?va.localeCompare(vb):va-vb)*st.sortDir;
+      });
+      noRows=!rws.length;
+      uRows=rws.map(x=>({
+        u:x.u, kls:x.kls, c:x.c, b:x.b, p:x.p.toFixed(1)+'%', run:x.run, g:x.g, s:x.s,
+        k:x.k, kBg:KPILL[x.k][0], kFg:KPILL[x.k][1],
+        dl:x.dl, dlBg:DLC[x.dl][0], dlFg:DLC[x.dl][1],
+        prTxt:x.pr||'-', prBg:x.pr?PRC[x.pr][0]:'#f1f5f9', prFg:x.pr?PRC[x.pr][1]:'#64748b'
+      }));
+    }
+
+    const colDefs=[['Unit','u'],['Kelas','kls'],['Cycle','c'],['Bermasalah','b'],['%','p'],['Run','run'],['GPS','g'],['Status','s'],['Klasifikasi','k'],['Rekomendasi DL','dl'],['Prioritas','pr']];
+    const cols=colDefs.map(([label,key])=>({
+      label, arrow: st.sortKey===key ? (st.sortDir===-1?' ▼':' ▲') : '',
+      onSort:()=>{ this.setState(s=>s.sortKey===key?{sortDir:-s.sortDir}:{sortKey:key, sortDir:-1}); }
+    }));
+
+    return {
+      loaded:st.loaded, period:st.period, kpis, prRows, uRows, cols, noRows, cellPad, showMethod,
+      q:st.q, fk:st.fk, fd:st.fd,
+      status:st.status, statusColor:st.statusErr?'#d92626':(st.isDemo?'#ED7D31':'#64748b'),
+      showHints:!st.small,
+      dropBg:st.over?'#eaf1f8':'#ffffff',
+      dropPad:st.small?'12px':'36px',
+      dropTitle:st.small?'Muat file lain':'Tarik & letakkan file export cycle MineStar di sini',
+      dropSub:st.small?'(tarik ke sini atau klik)':'atau klik untuk memilih file',
+      donutEl:this.chartEl('donut'), dlEl:this.chartEl('dl'), errEl:this.chartEl('err'),
+      fileRef:el=>{ this._fileInput=el; },
+      onDropClick:()=>{ if(this._fileInput) this._fileInput.click(); },
+      onDrop:e=>{ e.preventDefault(); this.setState({over:false}); const f=e.dataTransfer.files[0]; if(f) this.loadFile(f); },
+      onDragOver:e=>{ e.preventDefault(); if(!this.state.over) this.setState({over:true}); },
+      onDragLeave:()=>this.setState({over:false}),
+      onFile:e=>{ const f=e.target.files[0]; if(f) this.loadFile(f); },
+      onQ:e=>this.setState({q:e.target.value}),
+      onFk:e=>this.setState({fk:e.target.value}),
+      onFd:e=>this.setState({fd:e.target.value})
+    };
+  }
+}
+</script>
+</body>
+</html>
